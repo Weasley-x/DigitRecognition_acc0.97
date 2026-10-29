@@ -12,21 +12,25 @@ df = pd.read_csv(test_csv)
 print("test shape", df.shape)
 
 X = df.values.astype("float32") / 255.0
-X = torch.tensor(X, dtype = torch.float32)
+if X.ndim != 2 or X.shape[1] != 28 * 28:
+    raise ValueError(f"像素数据应为 [N, 784]，实际为 {X.shape}")
+X = torch.tensor(X, dtype=torch.float32).view(-1, 1, 28, 28)
 
 test_loader = DataLoader(TensorDataset(X), batch_size = 64, shuffle = False)
 
 #----------loadModel------------
-model = Network()
-model.load_state_dict(torch.load(model_path))
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model = Network().to(device)
+model.load_state_dict(torch.load(model_path, map_location=device))
 model.eval()
 
 #------------predict------------
 all_preds = []
 with torch.no_grad():
     for (batch_X,) in test_loader:
+        batch_X = batch_X.to(device)
         pred = model(batch_X).argmax(dim = 1)
-        all_preds.append(pred)
+        all_preds.append(pred.cpu())
 
 all_preds = torch.cat(all_preds).numpy()
 
