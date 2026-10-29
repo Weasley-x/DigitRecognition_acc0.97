@@ -10,9 +10,16 @@ print("device:", device)
 train_loader, val_loader = get_dataloaders("data/train.csv", batch_size=64)
 
 model = Network().to(device)
+# 利用交叉熵损失衡量模型输出与真实类别之间的差异
 criterion = nn.CrossEntropyLoss()
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-4)
+# Adam优化器
+optimizer = torch.optim.Adam(
+    model.parameters(),  # 需要训练的模型参数
+    lr=1e-3, # 学习率，控制参数更新的步幅
+    weight_decay=1e-4 # 权重衰减参数，对参数施加正则化约束
+)
 
+# 训练轮次为20次
 epochs = 20
 best_val_acc = 0.0
 for epoch in range(epochs):
@@ -21,9 +28,10 @@ for epoch in range(epochs):
     total_loss = 0
     for batch_X, batch_lab in train_loader:
         batch_X, batch_lab = batch_X.to(device), batch_lab.to(device)
-        optimizer.zero_grad()
-        out = model(batch_X)
-        loss = criterion(out, batch_lab)
+        optimizer.zero_grad() # 清空之前的计算梯度
+        out = model(batch_X) # 利用模型得到计算结果
+        loss = criterion(out, batch_lab) # 与真实标签计算损失
+        # 计算Loss之后，进行反向传播对模型进行训练
         loss.backward()
         optimizer.step()
         total_loss += loss.item()

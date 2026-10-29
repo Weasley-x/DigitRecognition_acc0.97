@@ -19,6 +19,7 @@ def get_dataloaders(csv_path, batch_size=64, val_ratio=0.1, seed=42):
 
     full = TensorDataset(X, lab)
 
+    # 将整个数据集中的10%作为验证集
     val_size = int(len(full) * val_ratio)
     train_size = len(full) - val_size
 
