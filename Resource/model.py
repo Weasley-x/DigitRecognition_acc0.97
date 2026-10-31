@@ -2,32 +2,42 @@ import torch
 from torch import nn
 
 
-class Network(nn.Module):
-    """升级版三层 CNN，用于 28x28 灰度数字图像分类。
+class ConvBlock(nn.Module):
+    """双卷积特征块：两次卷积提取局部笔画，再进行可选下采样。"""
 
-    卷积主干仍保持 ``1 -> 32 -> 64 -> 128``，便于和第一版 CNN 对比。
-    改动包括：卷积特征 Dropout、自适应池化和更紧凑的分类头。自适应池化
-    将 7x7 特征图压缩为 4x4，因此不会把大部分参数集中在全连接层。
+    def __init__(self, in_channels, out_channels, dropout=0.0, pool=True):
+        super().__init__()
+        layers = [
+            nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1, bias=False),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1, bias=False),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True),
+        ]
+        if pool:
+            layers.append(nn.MaxPool2d(2))
+        if dropout > 0:
+            layers.append(nn.Dropout2d(dropout))
+        self.block = nn.Sequential(*layers)
+
+    def forward(self, x):
+        return self.block(x)
+
+
+class Network(nn.Module):
+    """双卷积块版本的 CNN，用于 28x28 灰度数字图像分类。
+
+    三个特征块的通道数为 ``1 -> 32 -> 64 -> 128``。前两个块下采样，
+    因此空间尺寸为 ``28 -> 14 -> 7``；第三个块不再池化，避免过早丢失细笔画。
     """
 
     def __init__(self, num_classes=10):
         super().__init__()
         self.features = nn.Sequential(
-            nn.Conv2d(1, 32, kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm2d(32),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(2),                    # 28x28 -> 14x14
-
-            nn.Conv2d(32, 64, kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm2d(64),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(2),                    # 14x14 -> 7x7
-            nn.Dropout2d(0.10),
-
-            nn.Conv2d(64, 128, kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm2d(128),
-            nn.ReLU(inplace=True),
-            nn.Dropout2d(0.10),
+            ConvBlock(1, 32, dropout=0.05, pool=True),
+            ConvBlock(32, 64, dropout=0.10, pool=True),
+            ConvBlock(64, 128, dropout=0.10, pool=False),
         )
         self.pool = nn.AdaptiveAvgPool2d((4, 4))
         self.classifier = nn.Sequential(
